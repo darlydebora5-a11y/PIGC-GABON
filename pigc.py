@@ -13,7 +13,7 @@ from PIL.ExifTags import TAGS
 import pdf2image
 
 # --- CONFIGURATION SYSTÈME ---
-st.set_page_config(page_title="PIGC 2026 - Portail Sécurisé", layout="wide")
+st.set_page_config(page_title="PIGC 2026 - Portail Officiel", layout="wide")
 
 # Détection Tesseract
 tesseract_path = shutil.which("tesseract")
@@ -56,21 +56,19 @@ def analyser_document_visa(file, nom_candidat):
         
         mots_cles = ["REPUBLIQUE", "GABONAISE", "NAISSANCE", "ACTE"]
         is_officiel = any(word in texte for word in mots_cles)
-        
-        # Sécurité stricte du nom
-        nom_valide = nom_candidat.split()[0] in texte
+        nom_valide = nom_candidat.split()[0] in texte # Vérification du nom de famille
         
         if not is_officiel or not nom_valide:
             return False, (
                 "⚠️ ALERTE : Le document scanné pour justifier de l'acte de naissance n'est pas conforme. "
-                "Attention au faux et usage de faux qui sont punis par la loi gabonaise (Articles du Code Pénal). "
+                "Attention au faux et usage de faux qui sont punis par la loi gabonaise. "
                 "Veuillez fournir un scan original et lisible."
             )
         return True, "✅ DOCUMENT CERTIFIÉ CONFORME"
     except:
-        return False, "❌ ERREUR : Le fichier est illisible. Veuillez réessayer."
+        return False, "❌ ERREUR : Le fichier est illisible."
 
-# --- DESIGN & STYLE ---
+# --- DESIGN & STYLE ÉPURÉ ---
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #002366; }}
@@ -78,18 +76,19 @@ st.markdown(f"""
     .marquee {{ background-color: #ffffff; padding: 10px 0; border-bottom: 4px solid #FFD700; color: #FF0000; font-weight: 900; }}
     .logo-central {{ width: 100px; height: 100px; border-radius: 50%; border: 3px solid #FFD700; display: block; margin: 10px auto; background-color: white; }}
     
+    /* Boutons Logo Uniquement */
     .stButton>button {{
         border-radius: 50% !important;
-        width: 105px !important; height: 105px !important;
+        width: 100px !important; height: 100px !important;
         border: 3px solid #FFD700 !important;
         background-color: white !important;
-        color: #002366 !important;
-        font-size: 9px !important; font-weight: 900 !important;
-        text-transform: uppercase;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        margin: auto; transition: transform 0.2s; padding: 5px !important;
+        display: flex; align-items: center; justify-content: center;
+        margin: auto; transition: 0.3s; padding: 0 !important;
     }}
-    .stButton>button:hover {{ transform: scale(1.1); border-color: #fff !important; }}
+    .stButton>button:hover {{ transform: scale(1.1); border-color: #fff !important; box-shadow: 0 0 15px #FFD700; }}
+    
+    /* Image à l'intérieur du bouton */
+    .stButton button img {{ width: 70px !important; height: 70px !important; object-fit: contain; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -105,20 +104,22 @@ if 'data' not in st.session_state: st.session_state.data = {}
 
 INSTITUTS = {"INSG": "logo_insg.png", "IST": "logo_ist.png", "INPTIC": "logo_inptic.png", "IUSO": "logo_iuso.png", "ITO": "logo_ito.png"}
 
-# 1. ACCUEIL (HORIZONTAL)
+# --- 1. ACCUEIL (LOGOS CLIQUABLES UNIQUEMENT) ---
 if st.session_state.page == "accueil":
-    st.markdown("<p>Choisissez votre établissement pour t'inscrire</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size:1.2rem; margin-top:20px;'>Veuillez choisir votre établissement pour vous inscrire</p>", unsafe_allow_html=True)
+    
     cols = st.columns(5)
     for i, (name, logo_path) in enumerate(INSTITUTS.items()):
         with cols[i]:
             logo_b64 = get_base64_image(logo_path)
-            label = f"![icon]({logo_b64})\n{name}\nClic pour t'inscrire"
+            # Bouton avec logo uniquement (Markdown icon)
+            label = f"![{name}]({logo_b64})"
             if st.button(label, key=f"btn_{name}"):
                 st.session_state.data['ECOLE'] = name
                 st.session_state.page = "formulaire"
                 st.rerun()
 
-# 2. FORMULAIRE AVEC VILLES AUTOMATIQUES
+# --- 2. FORMULAIRE ---
 elif st.session_state.page == "formulaire":
     st.markdown(f"<h2>Pré-inscription : {st.session_state.data['ECOLE']}</h2>", unsafe_allow_html=True)
     
@@ -129,15 +130,14 @@ elif st.session_state.page == "formulaire":
         dob = c2.date_input("Date de naissance", min_value=date(1995,1,1))
         
         prov = st.selectbox("Province de résidence", list(VILLES_GABON.keys()))
-        ville = st.selectbox("Ville de résidence", VILLES_GABON[prov]) # VILLES AUTOMATIQUES
+        ville = st.selectbox("Ville de résidence", VILLES_GABON[prov])
         
         tel = st.text_input("Téléphone")
         email = st.text_input("Email")
         serie = st.selectbox("Série du BAC", ["A1", "A2", "B", "C", "D", "TI", "S"])
         
         st.write("---")
-        st.caption("📷 Scannez vos originaux (PDF ou Image)")
-        f1 = st.file_uploader("Acte de Naissance", type=["pdf", "jpg", "png"])
+        f1 = st.file_uploader("Acte de Naissance (Original)", type=["pdf", "jpg", "png"])
         f2 = st.file_uploader("Relevé du BAC", type=["pdf", "jpg", "png"])
         
         if st.form_submit_button("VÉRIFIER MES DOCUMENTS ➡️"):
@@ -148,19 +148,18 @@ elif st.session_state.page == "formulaire":
                         st.session_state.data.update({"NOM": nom, "SERIE": serie, "PROV": prov, "VILLE": ville})
                         st.session_state.page = "filieres"
                         st.rerun()
-                    else:
-                        st.error(msg)
+                    else: st.error(msg)
             else: st.warning("Veuillez remplir tous les champs.")
 
-# 3. FILIÈRES
+# --- 3. FILIÈRES ---
 elif st.session_state.page == "filieres":
     st.header(f"Filières disponibles ({st.session_state.data['SERIE']})")
-    choix = st.radio("Filière :", ["Gestion", "Informatique", "Réseaux"])
-    if st.button("VALIDER"):
+    choix = st.radio("Veuillez sélectionner votre filière :", ["Gestion", "Informatique", "Réseaux"])
+    if st.button("VALIDER MON CHOIX"):
         st.session_state.page = "paiement"
         st.rerun()
 
-# 4. PAIEMENT
+# --- 4. PAIEMENT ---
 elif st.session_state.page == "paiement":
     st.markdown("<h2>💳 PAIEMENT MOBILE (1000 FCFA)</h2>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -169,6 +168,6 @@ elif st.session_state.page == "paiement":
     if l_airtel: c1.image(l_airtel, width=90)
     if l_moov: c2.image(l_moov, width=90)
     
-    st.markdown("<p style='background:red; padding:10px; color:white;'>Payer les frais de 1000 FCFA.</p>", unsafe_allow_html=True)
-    if st.button("TERMINER"):
+    st.markdown("<p style='background:red; padding:10px; color:white;'>Veuillez vous acquitter des frais de 1000 FCFA pour finaliser votre dossier.</p>", unsafe_allow_html=True)
+    if st.button("TERMINER L'INSCRIPTION"):
         st.balloons()
