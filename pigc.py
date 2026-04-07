@@ -13,7 +13,12 @@ from PIL import Image
 st.set_page_config(page_title="PIGC - Plateforme Intégrée", layout="wide")
 DB_FILE = "inscriptions_pigc.csv"
 
-# Fonction pour encoder les images locales (Interface)
+# Initialisation du fichier de base de données s'il n'existe pas
+if not os.path.exists(DB_FILE):
+    df_init = pd.DataFrame(columns=["NOM", "BAC", "AGE", "DATE", "ECOLE", "FILIERE"])
+    df_init.to_csv(DB_FILE, index=False)
+
+# Fonction pour encoder les images (Essentiel pour l'affichage web rapide)
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
@@ -71,21 +76,24 @@ ECOLES_DATA = {
     "ITO": {"nom": "Institut de Technologies d'Owendo", "filières": ["Logistique", "Maintenance"], "bacs": ["C", "D", "E", "F", "TI"], "age_max": 23, "logo": "logo_ito.png", "code": "PIGC_ITO_2025"}
 }
 
-# --- FONCTION GÉNÉRATION PDF ---
+# --- FONCTION GÉNÉRATION PDF (VERSION SÉCURISÉE WEB) ---
 def generer_fiche_pdf(data):
     pdf = FPDF()
     pdf.add_page()
+    
     def ajouter_image_secu(path, x, y, w):
         if os.path.exists(path):
             try:
                 img = Image.open(path).convert("RGB")
-                temp_path = f"temp_{os.path.basename(path)}.jpg"
-                img.save(temp_path, "JPEG")
-                pdf.image(temp_path, x, y, w)
+                temp_img = f"temp_{int(time.time())}_{os.path.basename(path)}.jpg"
+                img.save(temp_img, "JPEG")
+                pdf.image(temp_img, x, y, w)
+                os.remove(temp_img) # Nettoyage immédiat
             except: pass
+
     ajouter_image_secu("logo_pigc.png", 10, 8, 33)
-    logo_ecole_path = f"ads/{ECOLES_DATA[data['ECOLE']]['logo']}"
-    ajouter_image_secu(logo_ecole_path, 160, 8, 33)
+    ajouter_image_secu(ECOLES_DATA[data['ECOLE']]['logo'], 160, 8, 33)
+    
     pdf.set_font("Arial", "B", 15)
     pdf.ln(25)
     pdf.cell(0, 10, "PLATEFORME PIGC - FICHE D'ENROLEMENT CERTIFIEE", 0, 1, "C")
@@ -94,22 +102,29 @@ def generer_fiche_pdf(data):
     pdf.cell(0, 10, f"ETABLISSEMENT : {ECOLES_DATA[data['ECOLE']]['nom']}", 1, 1, "L")
     pdf.ln(10)
     pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 10, f"NOM DU CANDIDAT : {data['NOM']}", 0, 1)
+    # Remplacement des caractères spéciaux pour compatibilité PDF Arial
+    nom_clean = data['NOM'].encode('latin-1', 'replace').decode('latin-1')
+    pdf.cell(0, 10, f"NOM DU CANDIDAT : {nom_clean}", 0, 1)
     pdf.cell(0, 10, f"FILIERE CHOISIE : {data['FILIERE']}", 0, 1)
     pdf.cell(0, 10, f"DATE D'INSCRIPTION : {data['DATE']}", 0, 1)
+    
     qr_data = f"PIGC-VERIF|{data['NOM']}|{data['ECOLE']}"
     qr = qrcode.make(qr_data)
-    qr.save("temp_qr.png")
-    pdf.image("temp_qr.png", 80, 140, 50)
+    qr_path = f"qr_{int(time.time())}.png"
+    qr.save(qr_path)
+    pdf.image(qr_path, 80, 140, 50)
+    os.remove(qr_path)
+    
     pdf.set_y(-40)
     pdf.set_font("Arial", "I", 8)
-    pdf.multi_cell(0, 5, "Document officiel généré par le système PIGC.\nSignature numérique certifiée conforme.", 0, "C")
+    pdf.multi_cell(0, 5, "Document officiel généré par le système PIGC.\nSignature numérique certifiée conforme au Code Pénal Gabonais.", 0, "C")
     return pdf.output(dest='S').encode('latin-1')
 
-# --- BANDEAU DÉFILANT BLANC ---
+# --- BANDEAU DÉFILANT BLANC (LOGOS À LA RACINE) ---
 try:
-    liste_logos = [f for f in os.listdir("ads") if f.endswith(".png")]
-    logos_html = "".join([f'<img src="{get_base64_image(f"ads/{l}")}" height="50" style="margin-left:50px;">' for l in liste_logos])
+    # Recherche dynamique des logos à la racine
+    liste_logos = [f for f in os.listdir(".") if f.startswith("logo_") and f.endswith(".png") and f != "logo_pigc.png"]
+    logos_html = "".join([f'<img src="{get_base64_image(l)}" height="50" style="margin-left:50px;">' for l in liste_logos])
 except: logos_html = ""
 
 st.markdown(f"""
@@ -123,7 +138,7 @@ st.markdown(f"""
     </div>
     """, unsafe_allow_html=True)
 
-# --- LOGO CIRCULAIRE ET TITRE CORRIGÉ ---
+# --- LOGO CIRCULAIRE ET TITRE ---
 logo_pigc_b64 = get_base64_image("logo_pigc.png")
 st.markdown(f"""
     <div class="logo-container"><img src="{logo_pigc_b64}" class="circular-logo"></div>
@@ -139,33 +154,39 @@ menu = st.sidebar.selectbox("MENU", ["📝 Portail Candidat", "🔐 Espace Direc
 if menu == "📝 Portail Candidat":
     if st.session_state.step == 1:
         st.subheader("👤 Étape 1 : Identification")
-        nom = st.text_input("NOM COMPLET").upper()
+        nom = st.text_input("NOM COMPLET (tel que sur l'acte)").upper()
         col1, col2 = st.columns(2)
         dob = col1.date_input("Date de Naissance", min_value=date(1998, 1, 1))
         serie = col2.selectbox("Série du BAC", ["A1", "A2", "B", "C", "D", "CG", "G2", "TI", "F", "S"])
-        f1 = st.file_uploader("Acte de Naissance", type=["pdf", "jpg", "png"])
-        f2 = st.file_uploader("Relevé de Bac", type=["pdf", "jpg", "png"])
+        f1 = st.file_uploader("Charger Acte de Naissance", type=["pdf", "jpg", "png"])
+        f2 = st.file_uploader("Charger Relevé de Bac", type=["pdf", "jpg", "png"])
+        
         if st.button("VALIDER ET ANALYSER LES PIÈCES ➡️"):
             if nom and f1 and f2:
                 age = date.today().year - dob.year
                 st.session_state.data.update({"NOM": nom, "BAC": serie, "AGE": age, "DATE": time.strftime("%d/%m/%Y %H:%M")})
                 st.session_state.step = 2
                 st.rerun()
+            else: st.warning("Veuillez remplir tous les champs.")
 
     elif st.session_state.step == 2:
         st.subheader("🏫 Étape 2 : Éligibilité & Choix")
-        ecole = st.selectbox("Établissement", list(ECOLES_DATA.keys()))
+        ecole = st.selectbox("Sélectionner l'établissement", list(ECOLES_DATA.keys()))
         config = ECOLES_DATA[ecole]
+        
+        if os.path.exists(config['logo']):
+            st.image(config['logo'], width=100)
+
         if st.session_state.data["AGE"] <= config["age_max"] and st.session_state.data["BAC"] in config["bacs"]:
-            st.success(f"✅ Éligible pour {config['nom']}")
-            filiere = st.selectbox("Filière", config["filières"])
+            st.success(f"✅ Profil éligible pour {config['nom']}")
+            filiere = st.selectbox("Choisir la filière", config["filières"])
             if st.button("CONFIRMER L'ENRÔLEMENT ➡️"):
                 st.session_state.data.update({"ECOLE": ecole, "FILIERE": filiere})
-                df = pd.DataFrame([st.session_state.data])
-                df.to_csv(DB_FILE, mode='a', header=not os.path.exists(DB_FILE), index=False)
+                df_to_save = pd.DataFrame([st.session_state.data])
+                df_to_save.to_csv(DB_FILE, mode='a', header=False, index=False)
                 st.session_state.step = 3
                 st.rerun()
-        else: st.error("🚫 Non éligible (Âge ou BAC).")
+        else: st.error(f"🚫 Non éligible (Critère Age max: {config['age_max']} ans ou série du BAC).")
 
     elif st.session_state.step == 3:
         st.balloons()
@@ -175,17 +196,19 @@ if menu == "📝 Portail Candidat":
         if st.button("Nouvelle Session"): st.session_state.step = 1; st.rerun()
 
 elif menu == "🔐 Espace Directions":
-    code = st.text_input("Code confidentiel", type="password")
+    code = st.text_input("Code confidentiel école", type="password")
     if code:
         ecole_id = next((e for e, c in ECOLES_DATA.items() if code == c["code"]), None)
-        if ecole_id and os.path.exists(DB_FILE):
-            df = pd.read_csv(DB_FILE)
-            st.dataframe(df[df['ECOLE'] == ecole_id])
+        if ecole_id:
+            st.success(f"Accès autorisé : {ecole_id}")
+            df_view = pd.read_csv(DB_FILE)
+            st.dataframe(df_view[df_view['ECOLE'] == ecole_id], use_container_width=True)
+        else: st.error("Code invalide.")
 
 # --- BAS DE PAGE JURIDIQUE ---
 st.markdown("""
     <div class="footer-warning-box">
-        <h3 style="color: #FFD700; margin-bottom: 15px; font-size: 1.4rem;">⚖️ AVERTISSEMENT JURIDIQUE</h3>
+        <h3 style="color: #FFD700; font-size: 1.4rem;">⚖️ AVERTISSEMENT JURIDIQUE</h3>
         <p style="color: #FFD700; font-size: 1rem; line-height: 1.6;">
             Conformément aux dispositions du Code Pénal Gabonais (Loi n°006/2020), Articles 282 et 283 :<br>
             Toute tentative de téléchargement de documents falsifiés ou usurpation d'identité entraînera des poursuites judiciaires immédiates devant les tribunaux compétents.
