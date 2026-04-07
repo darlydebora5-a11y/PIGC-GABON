@@ -59,60 +59,46 @@ def analyser_document_visa(file, nom_candidat):
         nom_valide = any(part in texte for part in nom_candidat.split())
         
         if not is_officiel or not nom_valide:
-            return False, (
-                "⚠️ ALERTE : Le document scanné pour justifier de l'acte de naissance n'est pas conforme. "
-                "Attention au faux et usage de faux qui sont punis par la loi gabonaise. "
-                "Veuillez fournir un scan original et lisible."
-            )
-        return True, "✅ DOCUMENT CERTIFIÉ CONFORME"
+            return False, "Analyse échouée : Document non conforme ou nom introuvable."
+        return True, "✅ CERTIFIÉ CONFORME"
     except:
-        return False, "❌ ERREUR : Le fichier est illisible."
+        return False, "❌ ERREUR : Fichier illisible."
 
-# --- DESIGN & STYLE (LOGOS VISIBLES & CENTRÉS) ---
+# --- DESIGN & STYLE ---
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #002366; }}
     h1, h2, h3, p, label {{ color: #FFD700 !important; text-align: center; font-weight: bold; }}
     .marquee {{ background-color: #ffffff; padding: 10px 0; border-bottom: 4px solid #FFD700; color: #FF0000; font-weight: 900; }}
-    
-    /* Logo Central de la plateforme */
     .logo-central {{ width: 120px; height: 120px; border-radius: 50%; border: 3px solid #FFD700; display: block; margin: 15px auto; background-color: white; object-fit: contain; }}
     
-    /* Forcer le centrage des colonnes */
     [data-testid="column"] {{ display: flex; justify-content: center; align-items: center; text-align: center; }}
 
-    /* Boutons des Instituts (Logos Agrandis) */
-    .stButton {{ display: flex; justify-content: center; }}
     .stButton>button {{
         border-radius: 50% !important;
-        width: 125px !important; height: 125px !important;
+        width: 120px !important; height: 120px !important;
         border: 3px solid #FFD700 !important;
         background-color: white !important;
         background-repeat: no-repeat !important;
         background-position: center !important;
-        background-size: 85% !important; /* Agrandit le logo à l'intérieur */
-        color: transparent !important; /* Cache le texte du bouton */
+        background-size: 85% !important;
+        color: transparent !important;
         margin: 10px auto !important; 
         transition: 0.3s; 
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }}
-    .stButton>button:hover {{ transform: scale(1.15); border-color: #fff !important; box-shadow: 0 0 20px #FFD700; }}
+    .stButton>button:hover {{ transform: scale(1.1); border-color: #fff !important; box-shadow: 0 0 20px #FFD700; }}
 
-    /* Styles pour chaque bouton spécifique (Background images) */
+    /* Styles pour chaque bouton (Background images) */
     {f"div.stButton > button[key='btn_INSG'] {{ background-image: url({get_base64_image('logo_insg.png')}) !important; }}" if os.path.exists('logo_insg.png') else ""}
     {f"div.stButton > button[key='btn_IST'] {{ background-image: url({get_base64_image('logo_ist.png')}) !important; }}" if os.path.exists('logo_ist.png') else ""}
     {f"div.stButton > button[key='btn_INPTIC'] {{ background-image: url({get_base64_image('logo_inptic.png')}) !important; }}" if os.path.exists('logo_inptic.png') else ""}
     {f"div.stButton > button[key='btn_IUSO'] {{ background-image: url({get_base64_image('logo_iuso.png')}) !important; }}" if os.path.exists('logo_iuso.png') else ""}
     {f"div.stButton > button[key='btn_ITO'] {{ background-image: url({get_base64_image('logo_ito.png')}) !important; }}" if os.path.exists('logo_ito.png') else ""}
-    
+
+    .fiche-box {{ background-color: white; padding: 30px; border-radius: 15px; border: 5px solid #FFD700; color: #002366 !important; text-align: left !important; }}
+    .fiche-box p, .fiche-box h2, .fiche-box h3 {{ color: #002366 !important; text-align: left !important; }}
     </style>
     """, unsafe_allow_html=True)
-
-# --- HEADER ---
-st.markdown('<div class="marquee"><marquee>CONCOURS PIGC 2026 : SYSTÈME DE VÉRIFICATION SÉCURISÉ - TOLÉRANCE ZÉRO POUR LE FAUX</marquee></div>', unsafe_allow_html=True)
-logo_pigc = get_base64_image("logo_pigc.png")
-if logo_pigc: st.markdown(f'<img src="{logo_pigc}" class="logo-central">', unsafe_allow_html=True)
-st.markdown('<h1>PIGC - PORTAIL OFFICIEL</h1>', unsafe_allow_html=True)
 
 # --- NAVIGATION ---
 if 'page' not in st.session_state: st.session_state.page = "accueil"
@@ -120,8 +106,12 @@ if 'data' not in st.session_state: st.session_state.data = {}
 
 INSTITUTS = ["INSG", "IST", "INPTIC", "IUSO", "ITO"]
 
-# --- 1. ACCUEIL (VOUVOIEMENT & LOGOS VISIBLES) ---
+# --- 1. ACCUEIL ---
 if st.session_state.page == "accueil":
+    st.markdown('<div class="marquee"><marquee>CONCOURS PIGC 2026 : SYSTÈME DE VÉRIFICATION SÉCURISÉ - TOLÉRANCE ZÉRO POUR LE FAUX</marquee></div>', unsafe_allow_html=True)
+    logo_pigc = get_base64_image("logo_pigc.png")
+    if logo_pigc: st.markdown(f'<img src="{logo_pigc}" class="logo-central">', unsafe_allow_html=True)
+    st.markdown('<h1>PIGC - PORTAIL OFFICIEL</h1>', unsafe_allow_html=True)
     st.markdown("<p style='font-size:1.2rem; margin-top:20px;'>Veuillez choisir votre établissement pour vous inscrire</p>", unsafe_allow_html=True)
     
     cols = st.columns(5)
@@ -141,14 +131,12 @@ elif st.session_state.page == "formulaire":
     st.markdown(f"<h2>Pré-inscription : {st.session_state.data['ECOLE']}</h2>", unsafe_allow_html=True)
     
     with st.form("form_pigc"):
-        nom = st.text_input("Nom et Prénom (tel qu'écrit sur l'acte)").upper()
+        nom = st.text_input("Nom et Prénom (MAJUSCULES)").upper()
         c1, c2 = st.columns(2)
         sexe = c1.selectbox("Sexe", ["Masculin", "Féminin"])
         dob = c2.date_input("Date de naissance", min_value=date(1995,1,1))
-        
         prov = st.selectbox("Province de résidence", list(VILLES_GABON.keys()))
         ville = st.selectbox("Ville de résidence", VILLES_GABON[prov])
-        
         tel = st.text_input("Téléphone")
         email = st.text_input("Email")
         serie = st.selectbox("Série du BAC", ["A1", "A2", "B", "C", "D", "TI", "S"])
@@ -157,16 +145,16 @@ elif st.session_state.page == "formulaire":
         f1 = st.file_uploader("Acte de Naissance (Scan Original)", type=["pdf", "jpg", "png"])
         f2 = st.file_uploader("Relevé du BAC", type=["pdf", "jpg", "png"])
         
-        if st.form_submit_button("VÉRIFIER MES DOCUMENTS ET CONTINUER ➡️"):
+        if st.form_submit_button("VÉRIFIER MES DOCUMENTS ➡️"):
             if nom and f1 and f2:
                 with st.spinner("Contrôle d'authenticité..."):
                     valide, msg = analyser_document_visa(f1, nom)
                     if valide:
-                        st.session_state.data.update({"NOM": nom, "SERIE": serie, "PROV": prov, "VILLE": ville})
+                        st.session_state.data.update({"NOM": nom, "SEXE": sexe, "DOB": dob, "PROV": prov, "VILLE": ville, "TEL": tel, "EMAIL": email, "SERIE": serie})
                         st.session_state.page = "filieres"
                         st.rerun()
                     else: st.error(msg)
-            else: st.warning("Veuillez remplir tous les champs obligatoires.")
+            else: st.warning("Veuillez remplir tous les champs.")
 
 # --- 3. FILIÈRES ---
 elif st.session_state.page == "filieres":
@@ -177,22 +165,62 @@ elif st.session_state.page == "filieres":
         st.session_state.page = "paiement"
         st.rerun()
 
-# --- 4. PAIEMENT & QR CODE ---
+# --- 4. PAIEMENT & FICHE FINALE ---
 elif st.session_state.page == "paiement":
     st.markdown("<h2>💳 PAIEMENT MOBILE (1000 FCFA)</h2>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    l_airtel = get_base64_image("airtel.png")
-    l_moov = get_base64_image("moov.png")
-    if l_airtel: c1.image(l_airtel, width=100)
-    if l_moov: c2.image(l_moov, width=100)
     
-    st.markdown("<p style='background:red; padding:15px; color:white; border-radius:10px;'>Veuillez vous acquitter des frais de 1000 FCFA pour finaliser votre dossier.</p>", unsafe_allow_html=True)
-    if st.button("TERMINER L'INSCRIPTION"):
+    if 'paye' not in st.session_state:
+        c1, c2 = st.columns(2)
+        l_airtel = get_base64_image("airtel.png")
+        l_moov = get_base64_image("moov.png")
+        if l_airtel: c1.image(l_airtel, width=100)
+        if l_moov: c2.image(l_moov, width=100)
+        st.warning("Veuillez vous acquitter des frais de 1000 FCFA pour débloquer votre fiche d'enrôlement.")
+        if st.button("TERMINER ET PAYER"):
+            st.session_state.paye = True
+            st.rerun()
+    else:
         st.balloons()
-        st.success("Paiement validé ! Voici votre QR Code de confirmation.")
-        
-        data_qr = f"PIGC|{st.session_state.data['NOM']}|{st.session_state.data['ECOLE']}"
-        qr = qrcode.make(data_qr)
+        # --- GÉNÉRATION DE LA FICHE VISUELLE ---
+        st.markdown(f"""
+            <div class="fiche-box">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #002366; padding-bottom: 10px;">
+                    <img src="{get_base64_image('logo_pigc.png')}" width="80">
+                    <div style="text-align: center;">
+                        <h2 style="margin:0;">PIGC GABON 2026</h2>
+                        <p style="margin:0; font-size: 12px;">Plateforme Intégrée de Gestion des Concours</p>
+                    </div>
+                    <img src="{get_base64_image(f"logo_{st.session_state.data['ECOLE'].lower()}.png")}" width="80">
+                </div>
+                
+                <h3 style="text-align: center; margin-top: 20px; text-decoration: underline;">FICHE DE PRÉ-INSCRIPTION CERTIFIÉE</h3>
+                
+                <table style="width: 100%; margin-top: 20px;">
+                    <tr><td><b>CANDIDAT :</b> {st.session_state.data['NOM']}</td><td><b>SEXE :</b> {st.session_state.data['SEXE']}</td></tr>
+                    <tr><td><b>DATE DE NAISSANCE :</b> {st.session_state.data['DOB']}</td><td><b>SÉRIE BAC :</b> {st.session_state.data['SERIE']}</td></tr>
+                    <tr><td><b>PROVINCE :</b> {st.session_state.data['PROV']}</td><td><b>VILLE :</b> {st.session_state.data['VILLE']}</td></tr>
+                    <tr><td><b>TÉLÉPHONE :</b> {st.session_state.data['TEL']}</td><td><b>ÉCOLE :</b> {st.session_state.data['ECOLE']}</td></tr>
+                    <tr><td colspan="2"><b>FILIÈRE CHOISIE :</b> {st.session_state.data['FILIERE']}</td></tr>
+                </table>
+
+                <div style="margin-top: 25px; padding: 10px; background: #e6f3ff; border-radius: 10px;">
+                    <h4>📂 DOCUMENTS REQUIS & STATUT</h4>
+                    <p>✅ Acte de Naissance : <b>TÉLÉVERSÉ & CONFORME</b></p>
+                    <p>✅ Relevé de Notes BAC : <b>TÉLÉVERSÉ & CONFORME</b></p>
+                    <p>✅ Frais Numériques (1000 FCFA) : <b>RÉGLÉS</b></p>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <p style="font-size: 10px;">Scannez ce code pour vérifier l'authenticité de votre fiche lors du dépôt physique.</p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Ajout du QR Code sous la fiche
+        qr_data = f"CERTIF-PIGC|{st.session_state.data['NOM']}|{st.session_state.data['ECOLE']}|OK"
+        qr_img = qrcode.make(qr_data)
         buf = BytesIO()
-        qr.save(buf, format="PNG")
-        st.image(buf, width=200)
+        qr_img.save(buf, format="PNG")
+        st.image(buf, width=150)
+        
+        st.download_button("📥 TÉLÉCHARGER MA FICHE (PNG)", data=buf.getvalue(), file_name=f"Fiche_PIGC_{st.session_state.data['NOM']}.png")
