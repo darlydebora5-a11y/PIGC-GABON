@@ -1,5 +1,6 @@
-streamlit
-pandas
-qrcode
-fpdf
+pytesseract
+py-tesseract
 Pillow
+qrcode
+pandas
+fpdf2
